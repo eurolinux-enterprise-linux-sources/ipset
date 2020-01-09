@@ -1,6 +1,6 @@
 Name:          ipset
 Version:       6.11
-Release:       3%{?dist}
+Release:       4%{?dist}
 Summary:       Manage Linux IP sets
 
 Group:         Applications/System
@@ -8,6 +8,7 @@ License:       GPLv2
 URL:           http://ipset.netfilter.org/
 Source0:       http://ipset.netfilter.org/%{name}-%{version}.tar.bz2
 Source1:       ipset.init
+Patch0:        ipset-6.11-ipset_port_usage.patch
 BuildRoot:     %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 BuildRequires: autoconf automake libtool
@@ -43,6 +44,7 @@ libraries.
 
 %prep
 %setup -q
+%patch0 -p1 -b .ipset_port_usage
 
 
 %build
@@ -99,6 +101,9 @@ fi
 
 
 %changelog
+* Wed Feb 25 2015 Thomas Woerner <twoerner@redhat.com> - 6.11-4
+- move ipset_port_usage into library (RHBZ#1121665)
+
 * Tue Aug 26 2014 Thomas Woerner <twoerner@redhat.com> - 6.11-3
 - fixed init script according to according to rhbz#1130570 and rhbz#888571#c28
 

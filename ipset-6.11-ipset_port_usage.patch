@@ -1,0 +1,148 @@
+commit f65b878e52494662fbb648132898575071bed75d
+Author: Neutron Soutmun <neo.neutron@gmail.com>
+Date:   Sun May 6 22:18:52 2012 +0200
+
+    Move ipset_port_usage() into lib
+
+diff --git a/Make_global.am b/Make_global.am
+index 0e81226..667436c 100644
+--- a/Make_global.am
++++ b/Make_global.am
+@@ -68,7 +68,7 @@
+ # as -version-info 2:0:0. This release has a new, but backwards incompatible
+ # interface. 
+ 
+-LIBVERSION = 2:0:0
++LIBVERSION = 2:1:0
+ 
+ AM_CPPFLAGS = $(kinclude_CFLAGS) $(all_includes) -I$(top_srcdir)/include \
+ 	-I/usr/local/include
+diff --git a/include/libipset/ui.h b/include/libipset/ui.h
+index 4c9a163..aa3979f 100644
+--- a/include/libipset/ui.h
++++ b/include/libipset/ui.h
+@@ -7,6 +7,7 @@
+ #ifndef LIBIPSET_UI_H
+ #define LIBIPSET_UI_H
+ 
++#include <stdbool.h>				/* bool */
+ #include <libipset/linux_ip_set.h>		/* enum ipset_cmd */
+ 
+ /* Commands in userspace */
+diff --git a/lib/Makefile.am b/lib/Makefile.am
+index 3d43523..eedd994 100644
+--- a/lib/Makefile.am
++++ b/lib/Makefile.am
+@@ -16,6 +16,7 @@ libipset_la_SOURCES = \
+ 	print.c \
+ 	session.c \
+ 	types.c \
++	ui.c \
+ 	ipset_bitmap_ip.c \
+ 	ipset_bitmap_ipmac.c \
+ 	ipset_bitmap_port.c \
+diff --git a/lib/libipset.map b/lib/libipset.map
+index 677c055..86bb923 100644
+--- a/lib/libipset.map
++++ b/lib/libipset.map
+@@ -106,7 +106,6 @@ global:
+   ipset_match_option;
+   ipset_match_envopt;
+   ipset_shift_argv;
+-  ipset_port_usage;
+   
+ local: *;
+ };
+@@ -114,4 +113,5 @@ local: *;
+ LIBIPSET_2.0 {
+ global:
+   ipset_load_types;
++  ipset_port_usage;
+ } LIBIPSET_1.0;
+diff --git a/lib/ui.c b/lib/ui.c
+new file mode 100644
+index 0000000..7cb4bc2
+--- /dev/null
++++ b/lib/ui.c
+@@ -0,0 +1,42 @@
++/* Copyright 2007-2010 Jozsef Kadlecsik (kadlec@blackhole.kfki.hu)
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <stdio.h>		/* printf */
++#include <libipset/icmp.h>	/* id_to_icmp */
++#include <libipset/icmpv6.h>	/* id_to_icmpv6 */
++#include <libipset/ui.h>	/* prototypes */
++
++/**
++ * ipset_port_usage - prints the usage for the port parameter
++ *
++ * Print the usage for the port parameter to stdout.
++ */
++void
++ipset_port_usage(void)
++{
++	int i;
++	const char *name;
++
++	printf("      [PROTO:]PORT is a valid pattern of the following:\n"
++	       "           PORTNAME         TCP port name from /etc/services\n"
++	       "           PORTNUMBER       TCP port number identifier\n"
++	       "           tcp|sctp|udp|udplite:PORTNAME|PORTNUMBER\n"
++	       "           icmp:CODENAME    supported ICMP codename\n"
++	       "           icmp:TYPE/CODE   ICMP type/code value\n"
++	       "           icmpv6:CODENAME  supported ICMPv6 codename\n"
++	       "           icmpv6:TYPE/CODE ICMPv6 type/code value\n"
++	       "           PROTO:0          all other protocols\n\n");
++
++	printf("           Supported ICMP codenames:\n");
++	i = 0;
++	while ((name = id_to_icmp(i++)) != NULL)
++		printf("               %s\n", name);
++	printf("           Supported ICMPv6 codenames:\n");
++	i = 0;
++	while ((name = id_to_icmpv6(i++)) != NULL)
++		printf("               %s\n", name);
++}
+diff --git a/src/ui.c b/src/ui.c
+index d139707..7e40bde 100644
+--- a/src/ui.c
++++ b/src/ui.c
+@@ -256,34 +256,3 @@ ipset_shift_argv(int *argc, char *argv[], int from)
+ 	(*argc)--;
+ 	return;
+ }
+-
+-/**
+- * ipset_port_usage - prints the usage for the port parameter
+- *
+- * Print the usage for the port parameter to stdout.
+- */
+-void
+-ipset_port_usage(void)
+-{
+-	int i;
+-	const char *name;
+-
+-	printf("      [PROTO:]PORT is a valid pattern of the following:\n"
+-	       "           PORTNAME         TCP port name from /etc/services\n"
+-	       "           PORTNUMBER       TCP port number identifier\n"
+-	       "           tcp|sctp|udp|udplite:PORTNAME|PORTNUMBER\n"
+-	       "           icmp:CODENAME    supported ICMP codename\n"
+-	       "           icmp:TYPE/CODE   ICMP type/code value\n"
+-	       "           icmpv6:CODENAME  supported ICMPv6 codename\n"
+-	       "           icmpv6:TYPE/CODE ICMPv6 type/code value\n"
+-	       "           PROTO:0          all other protocols\n\n");
+-
+-	printf("           Supported ICMP codenames:\n");
+-	i = 0;
+-	while ((name = id_to_icmp(i++)) != NULL)
+-		printf("               %s\n", name);
+-	printf("           Supported ICMPv6 codenames:\n");
+-	i = 0;
+-	while ((name = id_to_icmpv6(i++)) != NULL)
+-		printf("               %s\n", name);
+-}
