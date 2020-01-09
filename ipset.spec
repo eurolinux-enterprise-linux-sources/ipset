@@ -1,12 +1,13 @@
 Name:          ipset
 Version:       6.11
-Release:       1%{?dist}
+Release:       3%{?dist}
 Summary:       Manage Linux IP sets
 
 Group:         Applications/System
 License:       GPLv2
 URL:           http://ipset.netfilter.org/
 Source0:       http://ipset.netfilter.org/%{name}-%{version}.tar.bz2
+Source1:       ipset.init
 BuildRoot:     %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 BuildRequires: autoconf automake libtool
@@ -59,20 +60,32 @@ make %{?_smp_mflags}
 make install DESTDIR=%{buildroot}
 find %{buildroot} -name '*.la' -exec rm -f '{}' \;
 
+# install init scripts and configuration files
+install -d -m 755 %{buildroot}/etc/rc.d/init.d
+install -c -m 755 %{SOURCE1} %{buildroot}/etc/rc.d/init.d/ipset
+
 
 %clean
 rm -rf %{buildroot}
 
 
-%post -p /sbin/ldconfig
+%post
+/sbin/ldconfig
+/sbin/chkconfig --add ipset
 
 
 %postun -p /sbin/ldconfig
 
 
+%preun
+if [ "$1" = 0 ]; then
+        /sbin/chkconfig --del ipset
+fi
+
 %files
 %defattr(-,root,root,-)
 %doc COPYING ChangeLog
+%attr(0755,root,root) /etc/rc.d/init.d/ipset
 %doc %{_mandir}/man8/%{name}.8.gz
 %{_sbindir}/%{name}
 %{_libdir}/lib%{name}.so.*
@@ -86,6 +99,12 @@ rm -rf %{buildroot}
 
 
 %changelog
+* Tue Aug 26 2014 Thomas Woerner <twoerner@redhat.com> - 6.11-3
+- fixed init script according to according to rhbz#1130570 and rhbz#888571#c28
+
+* Fri Jun 13 2014 Thomas Woerner <twoerner@redhat.com> - 6.11-2
+- added ipset init script (rhbz#888571)
+
 * Fri Feb 10 2012 Thomas Woerner <twoerner@redhat.com> - 6.11-1
 - new version 6.11 with so library version 2, includes
 - cleaned up spec file for 6.11, dropped patch, no kernel will be built
