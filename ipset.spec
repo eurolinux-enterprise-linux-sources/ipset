@@ -2,8 +2,8 @@
 %define legacy_actions %{_libexecdir}/initscripts/legacy-actions
 
 Name:             ipset
-Version:          6.19
-Release:          6%{?dist}
+Version:          6.29
+Release:          1%{?dist}
 Summary:          Manage Linux IP sets
 
 License:          GPLv2
@@ -149,8 +149,7 @@ fi
 %files devel
 %{_includedir}/lib%{name}
 %{_libdir}/lib%{name}.so
-# not installed with 6.19
-#%{_libdir}/pkgconfig/lib%{name}.pc
+%{_libdir}/pkgconfig/lib%{name}.pc
 
 %files service
 %{_unitdir}/%{name}.service
@@ -163,6 +162,14 @@ fi
 
 
 %changelog
+* Wed Feb  1 2017 Thomas Woerner <twoerner@redhat.com> - 6.29-1
+- Rebase to 6.29 (RHBZ#1351299)
+- Fixes:
+  - Backport ipset capability to run in namespaces (RHBZ#1226051)
+  - Fix service save with empty ipset list and existing ipset save file
+    (RHBZ#1377621)
+  - Fix internal error at printing to output buffer (RHBZ#1395865)
+
 * Wed Aug 17 2016 Thomas Woerner <twoerner@redhat.com> - 6.19-6
 - Use /etc/sysconfig/ipset-config in service as EnvironmentFile (RHBZ#1136257)
 - Use /etc/sysconfig/ipset for data as in RHEL-6 (RHBZ#1136257)

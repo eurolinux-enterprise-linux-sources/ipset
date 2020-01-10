@@ -136,7 +136,13 @@ save() {
     lsmod | grep -q "^ip_set "
     [[ $? -ne 0 ]] && return 6
 
-    [[ -z $(${IPSET_BIN} list -name) ]] && return 0
+    if [[ -z $(${IPSET_BIN} list -name) ]]; then
+	if [[ -f $IPSET_DATA ]]; then
+	    mv $IPSET_DATA $IPSET_DATA.save && chmod 600 $IPSET_DATA.save \
+		    || return 1
+	fi
+	return 0
+    fi
 
     ret=0
     TMP_FILE=$(/bin/mktemp -q /tmp/$IPSET.XXXXXX) \
