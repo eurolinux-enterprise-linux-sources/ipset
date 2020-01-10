@@ -3,7 +3,7 @@
 
 Name:             ipset
 Version:          6.38
-Release:          2%{?dist}
+Release:          3%{?dist}
 Summary:          Manage Linux IP sets
 
 License:          GPLv2
@@ -176,6 +176,9 @@ exit 0
 
 
 %changelog
+* Tue Nov 06 2018 Stefano Brivio <sbrivio@redhat.com> - 6.38-3
+- Fix loading of sets with dependencies on other sets (RHBZ#1646666)
+
 * Wed Jun 27 2018 Stefano Brivio <sbrivio@redhat.com> - 6.38-2
 - Fix upgrade and downgrade triggers in specfile (RHBZ#1594722)
 

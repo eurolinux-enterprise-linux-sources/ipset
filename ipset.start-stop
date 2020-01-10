@@ -104,9 +104,16 @@ load() {
 	chmod 600 "${merged}"
 	set +f
 	if [ -d ${IPSET_DATA_DIR} ]; then
+		# Copy the first lines of each saved set first, as they create
+		# the sets, then the rest: list:set entries depend on other
+		# sets, so make sure they all get created first
 		for f in ${IPSET_DATA_DIR}/*; do
 			[ "${f}" = "${IPSET_DATA_DIR}/*" ] && break
-			cat "${f}" >> ${merged}
+			head -n1 "${f}" >> ${merged}
+		done
+		for f in ${IPSET_DATA_DIR}/*; do
+			[ "${f}" = "${IPSET_DATA_DIR}/*" ] && break
+			tail -n +2 "${f}" >> ${merged}
 		done
 	fi
 	set -f
