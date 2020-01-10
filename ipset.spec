@@ -2,8 +2,8 @@
 %define legacy_actions %{_libexecdir}/initscripts/legacy-actions
 
 Name:             ipset
-Version:          6.38
-Release:          3%{?dist}
+Version:          7.1
+Release:          1%{?dist}
 Summary:          Manage Linux IP sets
 
 License:          GPLv2
@@ -136,14 +136,14 @@ fi
 %postun service
 %systemd_postun_with_restart %{name}.service
 
-%triggerin service -- ipset-service < 6.38-1%{?dist}
+%triggerin service -- ipset-service < 6.38-1.el7
 # Before 6.38-1, ipset.start-stop keeps a backup of previously saved sets, but
 # doesn't touch the /etc/sysconfig/ipset.d/.saved flag. Remove the backup on
 # upgrade, so that we use the current version of saved sets
 rm -f /etc/sysconfig/ipset.save || :
 exit 0
 
-%triggerun service -- ipset-service < 6.38-1%{?dist}
+%triggerun service -- ipset-service < 6.38-1.el7
 # Up to 6.29-1, ipset.start-stop uses a single data file
 for f in /etc/sysconfig/ipset.d/*; do
     [ "${f}" = "/etc/sysconfig/ipset.d/*" ] && break
@@ -158,7 +158,8 @@ exit 0
 
 %files libs
 %doc COPYING
-%{_libdir}/lib%{name}.so.11*
+%{_libdir}/lib%{name}.so.13*
+%doc %{_mandir}/man3/lib%{name}.3.gz
 
 %files devel
 %{_includedir}/lib%{name}
@@ -176,6 +177,37 @@ exit 0
 
 
 %changelog
+* Sun Feb 24 2019 Stefano Brivio <sbrivio@redhat.com> - 7.1-1
+- Rebase to 7.1 (RHBZ#1649080):
+  - Add compatibility support for strscpy()
+  - Correct the manpage about the sort option
+  - Add missing functions to libipset.map
+  - configure.ac: Fix build regression on RHEL/CentOS/SL (Serhey Popovych)
+  - Implement sorting for hash types in the ipset tool
+  - Fix to list/save into file specified by option (reported by Isaac Good)
+  - Introduction of new commands and protocol version 7, updated kernel include files
+  - Add compatibility support for async in pernet_operations
+  - Use more robust awk patterns to check for backward compatibility
+  - Prepare the ipset tool to handle multiple protocol version
+  - Fix warning message handlin
+  - Correct to test null valued entry in hash:net6,port,net6 test
+  - Library reworked to support embedding ipset completely
+  - Add compatibility to support kvcalloc()
+  - Validate string type attributes in attr2data() (Stefano Brivio)
+  - manpage: Add comment about matching on destination MAC address (Stefano Brivio)
+    (RHBZ#1649079)
+  - Add compatibility to support is_zero_ether_addr()
+  - Fix use-after-free in ipset_parse_name_compat() (Stefano Brivio) (RHBZ#1649073)
+  - Fix leak in build_argv() on line parsing error (Stefano Brivio) (RHBZ#1649073)
+  - Simplify return statement in ipset_mnl_query() (Stefano Brivio) (RHBZ#1649073)
+  - tests/check_klog.sh: Try dmesg too, don't let shell terminate script (Stefano Brivio) 
+- Fixes:
+  - Fix all shellcheck warnings in init script (RHBZ#1649073)
+  - Make error reporting consistent, introduce different severities (RHBZ#1649877)
+  - While restoring, on invalid entries, remove them and retry (RHBZ#1650297)
+  - Fix covscan SC2166 warning in init script (RHBZ#1649073)
+  - Hardcode triggerin, triggerun versions for ipset-service (RHBZ#1646666)
+
 * Tue Nov 06 2018 Stefano Brivio <sbrivio@redhat.com> - 6.38-3
 - Fix loading of sets with dependencies on other sets (RHBZ#1646666)
 
