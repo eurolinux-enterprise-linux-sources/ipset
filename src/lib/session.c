@@ -231,10 +231,26 @@ ipset_session_report(struct ipset_session *session,
 	if (type == IPSET_ERROR) {
 		session->errmsg = session->report;
 		session->warnmsg = NULL;
+		ipset_data_reset(ipset_session_data(session));
 	} else {
 		session->errmsg = NULL;
 		session->warnmsg = session->report;
 	}
+	return -1;
+}
+
+/**
+ * ipset_session_warning_as_error - set warning as error
+ * @session: session structrure
+ *
+ * Returns -1.
+ */
+int
+ipset_session_warning_as_error(struct ipset_session *session)
+{
+	session->errmsg = session->report;
+	session->warnmsg = NULL;
+	ipset_data_reset(ipset_session_data(session));
 	return -1;
 }
 
@@ -514,6 +530,10 @@ static const struct ipset_attr_policy adt_attrs[] = {
 		.type = MNL_TYPE_U16,
 		.opt = IPSET_OPT_SKBQUEUE,
 	},
+	[IPSET_ATTR_PAD] = {
+		.type = MNL_TYPE_UNSPEC,
+		.len = 0,
+	},
 };
 
 static const struct ipset_attr_policy ipaddr_attrs[] = {
@@ -593,6 +613,8 @@ attr2data(struct ipset_session *session, struct nlattr *nla[],
 	attr = &attrs[type];
 	d = mnl_attr_get_payload(nla[type]);
 
+	if (attr->type == MNL_TYPE_UNSPEC)
+		return 0;
 	if (attr->type == MNL_TYPE_NESTED && attr->opt) {
 		/* IP addresses */
 		struct nlattr *ipattr[IPSET_ATTR_IPADDR_MAX+1] = {};
@@ -706,33 +728,47 @@ call_outfn(struct ipset_session *session)
 /* Handle printing failures */
 static jmp_buf printf_failure;
 
-static int __attribute__((format(printf, 2, 3)))
-safe_snprintf(struct ipset_session *session, const char *fmt, ...)
+static int
+handle_snprintf_error(struct ipset_session *session,
+		      int len, int ret, int loop)
 {
-	va_list args;
-	int len, ret, loop = 0;
-
-retry:
-	len = strlen(session->outbuf);
-	D("len: %u, retry %u", len, loop);
-	va_start(args, fmt);
-	ret = vsnprintf(session->outbuf + len, IPSET_OUTBUFLEN - len,
-			fmt, args);
-	va_end(args);
-
 	if (ret < 0 || ret >= IPSET_OUTBUFLEN - len) {
 		/* Buffer was too small, push it out and retry */
-		D("print buffer and try again: %u", len);
-		if (loop++) {
+		D("print buffer and try again: len: %u, ret: %d", len, ret);
+		if (loop) {
 			ipset_err(session,
 				"Internal error at printing, loop detected!");
 			longjmp(printf_failure, 1);
 		}
 
 		session->outbuf[len] = '\0';
-		if (!call_outfn(session))
-			goto retry;
+		if (call_outfn(session)) {
+			ipset_err(session,
+				"Internal error, could not print output buffer!");
+			longjmp(printf_failure, 1);
+		}
+		return 1;
 	}
+	return 0;
+}
+
+static int __attribute__((format(printf, 2, 3)))
+safe_snprintf(struct ipset_session *session, const char *fmt, ...)
+{
+	va_list args;
+	int len, ret, loop = 0;
+
+	do {
+		len = strlen(session->outbuf);
+		D("len: %u, retry %u", len, loop);
+		va_start(args, fmt);
+		ret = vsnprintf(session->outbuf + len,
+				IPSET_OUTBUFLEN - len,
+				fmt, args);
+		va_end(args);
+		loop = handle_snprintf_error(session, len, ret, loop);
+	} while (loop);
+
 	return ret;
 }
 
@@ -742,25 +778,14 @@ safe_dprintf(struct ipset_session *session, ipset_printfn fn,
 {
 	int len, ret, loop = 0;
 
-retry:
-	len = strlen(session->outbuf);
-	D("len: %u, retry %u", len, loop);
-	ret = fn(session->outbuf + len, IPSET_OUTBUFLEN - len,
-		 session->data, opt, session->envopts);
+	do {
+		len = strlen(session->outbuf);
+		D("len: %u, retry %u", len, loop);
+		ret = fn(session->outbuf + len, IPSET_OUTBUFLEN - len,
+			 session->data, opt, session->envopts);
+		loop = handle_snprintf_error(session, len, ret, loop);
+	} while (loop);
 
-	if (ret < 0 || ret >= IPSET_OUTBUFLEN - len) {
-		/* Buffer was too small, push it out and retry */
-		D("print buffer and try again: %u", len);
-		if (loop++) {
-			ipset_err(session,
-				"Internal error at printing, loop detected!");
-			longjmp(printf_failure, 1);
-		}
-
-		session->outbuf[len] = '\0';
-		if (!call_outfn(session))
-			goto retry;
-	}
 	return ret;
 }
 
@@ -807,8 +832,9 @@ list_adt(struct ipset_session *session, struct nlattr *nla[])
 	if (session->mode == IPSET_LIST_XML)
 		safe_snprintf(session, "</elem>");
 
-	for (arg = type->args[IPSET_ADD]; arg != NULL && arg->opt; arg++) {
-		D("print arg opt %u %s", arg->opt,
+	for (i = 0; type->cmd[IPSET_ADD].args[i] != IPSET_ARG_NONE; i++) {
+		arg = ipset_keyword(type->cmd[IPSET_ADD].args[i]);
+		D("print arg opt %u (%s) %s", arg->opt, arg->name[0],
 		   ipset_data_test(data, arg->opt) ? "(yes)" : "(missing)");
 		if (!(arg->print && ipset_data_test(data, arg->opt)))
 			continue;
@@ -895,7 +921,12 @@ list_create(struct ipset_session *session, struct nlattr *nla[])
 		break;
 	}
 
-	for (arg = type->args[IPSET_CREATE]; arg != NULL && arg->opt; arg++) {
+	D("type %s, rev %u", type->name, type->revision);
+	for (i = 0; type->cmd[IPSET_CREATE].args[i] != IPSET_ARG_NONE; i++) {
+		arg = ipset_keyword(type->cmd[IPSET_CREATE].args[i]);
+		D("create print arg opt %u (%s) %s", arg->opt,
+		   arg->name[0] ? arg->name[0] : "",
+		   ipset_data_test(data, arg->opt) ? "(yes)" : "(missing)");
 		if (!arg->print ||
 		    !ipset_data_test(data, arg->opt) ||
 		    (arg->opt == IPSET_OPT_FAMILY &&

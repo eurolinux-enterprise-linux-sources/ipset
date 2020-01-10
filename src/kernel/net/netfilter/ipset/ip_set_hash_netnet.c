@@ -131,6 +131,13 @@ hash_netnet4_data_next(struct hash_netnet4_elem *next,
 #define HOST_MASK	32
 #include "ip_set_hash_gen.h"
 
+static void
+hash_netnet4_init(struct hash_netnet4_elem *e)
+{
+	e->cidr[0] = HOST_MASK;
+	e->cidr[1] = HOST_MASK;
+}
+
 static int
 hash_netnet4_kadt(struct ip_set *set, const struct sk_buff *skb,
 		  const struct xt_action_param *par,
@@ -162,16 +169,14 @@ hash_netnet4_uadt(struct ip_set *set, struct nlattr *tb[],
 	ipset_adtfn adtfn = set->variant->adt[adt];
 	struct hash_netnet4_elem e = { };
 	struct ip_set_ext ext = IP_SET_INIT_UEXT(set);
-	u32 ip = 0, ip_to = 0, last;
-	u32 ip2 = 0, ip2_from = 0, ip2_to = 0, last2;
+	u32 ip = 0, ip_to = 0;
+	u32 ip2 = 0, ip2_from = 0, ip2_to = 0;
 	int ret;
-
-	e.cidr[0] = HOST_MASK;		/* gcc-4.4.4 has initializer issues */
-	e.cidr[1] = HOST_MASK;
 
 	if (tb[IPSET_ATTR_LINENO])
 		*lineno = nla_get_u32(tb[IPSET_ATTR_LINENO]);
 
+	hash_netnet4_init(&e);
 	if (unlikely(!tb[IPSET_ATTR_IP] || !tb[IPSET_ATTR_IP2] ||
 		     !ip_set_optattr_netorder(tb, IPSET_ATTR_CADT_FLAGS)))
 		return -IPSET_ERR_PROTOCOL;
@@ -242,27 +247,27 @@ hash_netnet4_uadt(struct ip_set *set, struct nlattr *tb[],
 		ip_set_mask_from_to(ip2_from, ip2_to, e.cidr[1]);
 	}
 
-	if (retried)
+	if (retried) {
 		ip = ntohl(h->next.ip[0]);
+		ip2 = ntohl(h->next.ip[1]);
+	} else {
+		ip2 = ip2_from;
+	}
 
-	while (!after(ip, ip_to)) {
+	do {
 		e.ip[0] = htonl(ip);
-		last = ip_set_range_to_cidr(ip, ip_to, &e.cidr[0]);
-		ip2 = (retried &&
-		       ip == ntohl(h->next.ip[0])) ? ntohl(h->next.ip[1])
-						   : ip2_from;
-		while (!after(ip2, ip2_to)) {
+		ip = ip_set_range_to_cidr(ip, ip_to, &e.cidr[0]);
+		do {
 			e.ip[1] = htonl(ip2);
-			last2 = ip_set_range_to_cidr(ip2, ip2_to, &e.cidr[1]);
+			ip2 = ip_set_range_to_cidr(ip2, ip2_to, &e.cidr[1]);
 			ret = adtfn(set, &e, &ext, &ext, flags);
 			if (ret && !ip_set_eexist(ret, flags))
 				return ret;
 
 			ret = 0;
-			ip2 = last2 + 1;
-		}
-		ip = last + 1;
-	}
+		} while (ip2++ < ip2_to);
+		ip2 = ip2_from;
+	} while (ip++ < ip_to);
 	return ret;
 }
 
@@ -360,6 +365,13 @@ hash_netnet6_data_next(struct hash_netnet6_elem *next,
 #define IP_SET_EMIT_CREATE
 #include "ip_set_hash_gen.h"
 
+static void
+hash_netnet6_init(struct hash_netnet6_elem *e)
+{
+	e->cidr[0] = HOST_MASK;
+	e->cidr[1] = HOST_MASK;
+}
+
 static int
 hash_netnet6_kadt(struct ip_set *set, const struct sk_buff *skb,
 		  const struct xt_action_param *par,
@@ -392,12 +404,10 @@ hash_netnet6_uadt(struct ip_set *set, struct nlattr *tb[],
 	struct ip_set_ext ext = IP_SET_INIT_UEXT(set);
 	int ret;
 
-	e.cidr[0] = HOST_MASK;		/* gcc-4.4.4 has initializer issues */
-	e.cidr[1] = HOST_MASK;
-
 	if (tb[IPSET_ATTR_LINENO])
 		*lineno = nla_get_u32(tb[IPSET_ATTR_LINENO]);
 
+	hash_netnet6_init(&e);
 	if (unlikely(!tb[IPSET_ATTR_IP] || !tb[IPSET_ATTR_IP2] ||
 		     !ip_set_optattr_netorder(tb, IPSET_ATTR_CADT_FLAGS)))
 		return -IPSET_ERR_PROTOCOL;

@@ -416,6 +416,30 @@ ipset_type_get(struct ipset_session *session, enum ipset_cmd cmd)
 }
 
 /**
+ * ipset_type_higher_rev - find the next higher userspace revision
+ * @type: set type
+ *
+ * Find the next higher revision of the set type for the input
+ * set type. Higher revision numbers come first on typelist.
+ *
+ * Returns the found or original set type, cannot fail.
+ */
+const struct ipset_type *
+ipset_type_higher_rev(const struct ipset_type *type)
+{
+	const struct ipset_type *t;
+
+	/* Check all registered types in userspace */
+	for (t = typelist; t != NULL; t = t->next) {
+		if (STREQ(type->name, t->name)
+		    && type->family == t->family
+		    && type == t->next)
+			return t;
+	}
+	return type;
+}
+
+/**
  * ipset_type_check - check the set type received from kernel
  * @session: session structure
  *
@@ -452,7 +476,7 @@ ipset_type_check(struct ipset_session *session)
 	if (!match)
 		return ipset_errptr(session,
 			     "Kernel and userspace incompatible: "
-			     "settype %s with revision %u not supported ",
+			     "settype %s with revision %u not supported "
 			     "by userspace.", typename, revision);
 
 	set_family_and_type(data, match, family);
@@ -473,12 +497,21 @@ int
 ipset_type_add(struct ipset_type *type)
 {
 	struct ipset_type *t, *prev;
+	const struct ipset_arg *arg;
+	enum ipset_adt cmd;
+	int i;
 
 	assert(type);
 
 	if (strlen(type->name) > IPSET_MAXNAMELEN - 1)
 		return -EINVAL;
 
+	for (cmd = IPSET_ADD; cmd < IPSET_CADT_MAX; cmd++) {
+		for (i = 0; type->cmd[cmd].args[i] != IPSET_ARG_NONE; i++) {
+			arg = ipset_keyword(type->cmd[cmd].args[i]);
+			type->cmd[cmd].full |= IPSET_FLAG(arg->opt);
+		}
+	}
 	/* Add to the list: higher revision numbers first */
 	for (t = typelist, prev = NULL; t != NULL; t = t->next) {
 		if (STREQ(t->name, type->name)) {

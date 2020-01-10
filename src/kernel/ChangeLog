@@ -1,3 +1,82 @@
+6.37
+  - netfilter: ipset: Use is_zero_ether_addr instead of static and memcmp
+    (Joe Perches)
+
+6.36
+  - Remove duplicate module description
+  - netfilter: remove messages print and boot/module load time
+    (Pablo Neira Ayuso)
+  - Fix wraparound bug introduced in commit 48596a8ddc46 in v6.34
+    (reported by Thomas Schwark)
+
+6.35
+  - netfilter: mark expected switch fall-throughs (Gustavo A. R. Silva)
+  - License cleanup: add SPDX GPL-2.0 license identifier to files with no
+    license (Greg Kroah-Hartman)
+  - Backport patch: netfilter: ipset: use nfnl_mutex_is_locked
+  - Missing nfnl_lock()/nfnl_unlock() is added to ip_set_net_exit()
+  - netfilter: ipset: use nfnl_mutex_is_locked (Florian Westphal)
+  - netfilter: ipset: add resched points during set listing
+    (Florian Westphal)
+  - Fix "don't update counters" mode when counters used at the matching
+  - Backport patch: netfilter: ipset: Convert timers to use timer_setup()
+  - netfilter: ipset: use swap macro instead of _manually_ swapping values
+    (Gustavo A. R. Silva)
+  - netfilter: ipset: Fix race between dump and swap (Ross Lagerwall)
+  - netfilter: ipset: pernet ops must be unregistered last (Florian
+    Westphal)
+
+6.34
+  - Fix adding an IPv4 range containing more than 2^31 addresses
+    (bugzilla id #1005, reported by Oleg Serditov and Oliver Ford)
+
+6.33
+  - Backport patch: sctp: remove the typedef sctp_sctphdr_t
+  - Backport patch: netfilter: nfnetlink: extended ACK reporting
+  - ipset: remove unused function __ip_set_get_netlink (Aaron Conole)
+  - Backport patch: netlink: pass extended ACK struct to parsing functions
+  - Backport patch netlink: extended ACK reporting
+  - netfilter: Remove exceptional & on function name (Arushi Singhal)
+  - Backport missing part of patch: netfilter: Remove unnecessary cast on
+    void pointer
+  - Backport nfnl_msg_type()
+  - netfilter: ipset: ipset list may return wrong member count for set with
+    timeout (Vishwanath Pai)
+  - netfilter: ipset: deduplicate prefixlen maps (Aaron Conole)
+  - Fix sparse warnings
+  - netfilter: ipset: Compress return logic (simran singhal)
+  - netfilter: ipset: Remove unnecessary cast on void pointer (simran
+    singhal)
+  - Compatibility: handle changes in 4.10 kernel tree
+
+6.31
+  - netfilter: ipset: Null pointer exception in ipset list:set
+    (Vishwanath Pai)
+  - Fix bug: sometimes valid entries in hash:* types of sets were evicted
+    (reported by Eric Ewanco)
+  - Correct copyright owner
+  - Revert patch "Correct rcu_dereference_bh_nfnl() usage"
+
+6.30
+  - netfilter: ipset: hash: fix boolreturn.cocci warnings
+    (Fengguang Wu)
+  - Fix the nla_put_net64() API changes backport
+  - netfilter: ipset: Fixing unnamed union init (Elad Raz)
+  - netfilter: x_tables: Use par->net instead of computing from the passed
+    net devices (Eric W. Biederman)
+  - Correct the reported memory size for bitmap:* types
+  - Fix coding styles reported by checkpatch.pl, already in kernel
+  - netfilter: x_tables: Pass struct net in xt_action_param
+    (Eric W. Biederman)
+  - net: sched: fix skb->protocol use in case of accelerated vlan path
+    (Jiri Pirko)
+  - Check IPSET_ATTR_ETHER netlink attribute length in hash:ipmac too
+  - netfilter: fix include files for compilation (Mikko Rapeli)
+  - ipset: Backports for the nla_put_net64() API changes (Neutron Soutmun)
+  - netfilter: ipset: use setup_timer() and mod_timer().
+    (Muhammad Falak R Wani)
+  - hash:ipmac type support added to ipset (Tomasz Chilinski)
+
 6.29
   - Fix race condition in ipset save, swap and delete (Vishwanath Pai)
 

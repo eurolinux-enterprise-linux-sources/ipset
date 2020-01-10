@@ -292,7 +292,8 @@ parse_portname(struct ipset_session *session, const char *str,
 
 error:
 	free(saved);
-	return syntax_err("cannot parse '%s' as a %s port", str, proto);
+	return ipset_warn(session, "cannot parse '%s' as a %s port",
+			  str, proto);
 }
 
 /**
@@ -313,21 +314,22 @@ ipset_parse_port(struct ipset_session *session,
 		 const char *proto)
 {
 	uint16_t port;
-	int err;
 
 	assert(session);
 	assert(opt == IPSET_OPT_PORT || opt == IPSET_OPT_PORT_TO);
 	assert(str);
 
-	if ((err = string_to_u16(session, str, &port)) == 0 ||
-	    (err = parse_portname(session, str, &port, proto)) == 0)
-		err = ipset_session_data_set(session, opt, &port);
-
-	if (!err)
-		/* No error, so reset false error messages! */
+	if (parse_portname(session, str, &port, proto) == 0) {
+		return ipset_session_data_set(session, opt, &port);
+	}
+	/* Error is stored as warning in session report */
+	if (string_to_u16(session, str, &port) == 0) {
+		/* No error, so reset false error messages */
 		ipset_session_report_reset(session);
-
-	return err;
+		return ipset_session_data_set(session, opt, &port);
+	}
+	/* Restore warning as error */
+	return ipset_session_warning_as_error(session);
 }
 
 /**
@@ -631,7 +633,7 @@ ipset_parse_proto_port(struct ipset_session *session,
 		case IPPROTO_ICMP:
 			if (family != NFPROTO_IPV4) {
 				syntax_err("Protocol ICMP can be used "
-					   "with family INET only");
+					   "with family inet only");
 				goto error;
 			}
 			err = ipset_parse_icmp(session, opt, a);
@@ -639,7 +641,7 @@ ipset_parse_proto_port(struct ipset_session *session,
 		case IPPROTO_ICMPV6:
 			if (family != NFPROTO_IPV6) {
 				syntax_err("Protocol ICMPv6 can be used "
-					   "with family INET6 only");
+					   "with family inet6 only");
 				goto error;
 			}
 			err = ipset_parse_icmpv6(session, opt, a);
@@ -742,7 +744,7 @@ ipset_parse_family(struct ipset_session *session,
 	else if (STREQ(str, "any") || STREQ(str, "unspec"))
 		family = NFPROTO_UNSPEC;
 	else
-		return syntax_err("unknown INET family %s", str);
+		return syntax_err("unknown inet family %s", str);
 
 	return ipset_data_set(data, opt, &family);
 }

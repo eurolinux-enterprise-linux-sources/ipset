@@ -36,7 +36,6 @@ inet6)
 	;;
 esac
 
-
 case "$2" in
 start)
 	$ipset n ip1 hash:ip $family 2>/dev/null
@@ -93,16 +92,16 @@ start_flags_reversed)
 	;;
 del)
 	$cmd -F INPUT
-	$cmd -A INPUT -j SET --del-set ipport src,src
+	$cmd -A INPUT -s $NET -j SET --del-set ipport src,src
 	;;
 add)
 	$ipset n test hash:net $family 2>/dev/null
 	$cmd -F INPUT
-	$cmd -A INPUT -j SET --add-set test src
+	$cmd -A INPUT -s $NET -j SET --add-set test src
 	;;
 timeout)
 	$ipset n test hash:ip,port timeout 2
-	$cmd -A INPUT -j SET --add-set test src,src --timeout 10 --exist
+	$cmd -A INPUT -s $NET -j SET --add-set test src,src --timeout 10 --exist
 	;;
 mangle)
 	$ipset n test hash:net $family skbinfo 2>/dev/null
@@ -116,6 +115,15 @@ netiface)
 	$ipset a test 0.0.0.0/0,eth0
 	$cmd -A OUTPUT -m set --match-set test dst,dst -j LOG --log-prefix "in set netiface: "
 	$cmd -A OUTPUT -d 10.255.255.254 -j DROP
+	;;
+counter)
+	$ipset n test hash:ip counters
+	$ipset a test 10.255.255.64
+	$cmd -A OUTPUT -m set --match-set test src --packets-gt 1 ! --update-counters -j DROP
+	$cmd -A OUTPUT -m set --match-set test src -j DROP
+	./sendip.sh -p ipv4 -id 10.255.255.254 -is 10.255.255.64 -p udp -ud 80 -us 1025 10.255.255.254 >/dev/null 2>&1
+	./sendip.sh -p ipv4 -id 10.255.255.254 -is 10.255.255.64 -p udp -ud 80 -us 1025 10.255.255.254 >/dev/null 2>&1
+	./sendip.sh -p ipv4 -id 10.255.255.254 -is 10.255.255.64 -p udp -ud 80 -us 1025 10.255.255.254 >/dev/null 2>&1
 	;;
 stop)
 	$cmd -F

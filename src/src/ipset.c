@@ -275,18 +275,24 @@ static bool do_parse(const struct ipset_arg *arg, bool family)
 }
 
 static int
-call_parser(int *argc, char *argv[], const struct ipset_arg *args, bool family)
+call_parser(int *argc, char *argv[], const struct ipset_type *type,
+	    enum ipset_adt cmd, bool family)
 {
-	int ret = 0, i = 1;
 	const struct ipset_arg *arg;
 	const char *optstr;
+	const struct ipset_type *t = type;
+	uint8_t revision = type->revision;
+	int ret = 0, i = 1, j;
 
 	/* Currently CREATE and ADT may have got additional arguments */
-	if (!args && *argc > 1)
-		goto err_unknown;
+	if (type->cmd[cmd].args[0] == IPSET_ARG_NONE && *argc > 1)
+		return exit_error(PARAMETER_PROBLEM, "Unknown argument: `%s'",
+				  argv[i]);
+
 	while (*argc > i) {
 		ret = -1;
-		for (arg = args; arg->opt; arg++) {
+		for (j = 0; type->cmd[cmd].args[j] != IPSET_ARG_NONE; j++) {
+			arg = ipset_keyword(type->cmd[cmd].args[j]);
 			D("argc: %u, %s vs %s", i, argv[i], arg->name[0]);
 			if (!(ipset_match_option(argv[i], arg->name)))
 				continue;
@@ -336,6 +342,21 @@ call_parser(int *argc, char *argv[], const struct ipset_arg *args, bool family)
 	return ret;
 
 err_unknown:
+	while ((type = ipset_type_higher_rev(t)) != t) {
+		for (j = 0; type->cmd[cmd].args[j] != IPSET_ARG_NONE; j++) {
+			arg = ipset_keyword(type->cmd[cmd].args[j]);
+			D("argc: %u, %s vs %s", i, argv[i], arg->name[0]);
+			if (ipset_match_option(argv[i], arg->name))
+				return exit_error(PARAMETER_PROBLEM,
+					"Argument `%s' is supported in the kernel module "
+					"of the set type %s starting from the revision %u "
+					"and you have installed revision %u only. "
+					"Your kernel is behind your ipset utility.",
+					argv[i], type->name,
+					type->revision, revision);
+		}
+		t = type;
+	}
 	return exit_error(PARAMETER_PROBLEM, "Unknown argument: `%s'", argv[i]);
 }
 
@@ -361,8 +382,9 @@ check_mandatory(const struct ipset_type *type, enum ipset_cmd command)
 {
 	enum ipset_adt cmd = cmd2cmd(command);
 	uint64_t flags = ipset_data_flags(ipset_session_data(session));
-	uint64_t mandatory = type->mandatory[cmd];
-	const struct ipset_arg *arg = type->args[cmd];
+	uint64_t mandatory = type->cmd[cmd].need;
+	const struct ipset_arg *arg;
+	int i;
 
 	/* Range can be expressed by ip/cidr */
 	if (flags & IPSET_FLAG(IPSET_OPT_CIDR))
@@ -371,7 +393,7 @@ check_mandatory(const struct ipset_type *type, enum ipset_cmd command)
 	mandatory &= ~flags;
 	if (!mandatory)
 		return;
-	if (!arg) {
+	if (type->cmd[cmd].args[0] == IPSET_ARG_NONE) {
 		exit_error(OTHER_PROBLEM,
 			"There are missing mandatory flags "
 			"but can't check them. "
@@ -379,13 +401,15 @@ check_mandatory(const struct ipset_type *type, enum ipset_cmd command)
 		return;
 	}
 
-	for (; arg->opt; arg++)
+	for (i = 0; type->cmd[cmd].args[i] != IPSET_ARG_NONE; i++) {
+		arg = ipset_keyword(type->cmd[cmd].args[i]);
 		if (mandatory & IPSET_FLAG(arg->opt)) {
 			exit_error(PARAMETER_PROBLEM,
 				   "Mandatory option `%s' is missing",
 				   arg->name[0]);
 			return;
 		}
+	}
 }
 
 static const char *
@@ -417,11 +441,12 @@ check_allowed(const struct ipset_type *type, enum ipset_cmd command)
 {
 	uint64_t flags = ipset_data_flags(ipset_session_data(session));
 	enum ipset_adt cmd = cmd2cmd(command);
-	uint64_t allowed = type->full[cmd];
+	uint64_t allowed = type->cmd[cmd].full;
 	uint64_t cmdflags = command == IPSET_CMD_CREATE
 				? IPSET_CREATE_FLAGS : IPSET_ADT_FLAGS;
-	const struct ipset_arg *arg = type->args[cmd];
+	const struct ipset_arg *arg;
 	enum ipset_opt i;
+	int j;
 
 	/* Range can be expressed by ip/cidr or from-to */
 	if (allowed & IPSET_FLAG(IPSET_OPT_IP_TO))
@@ -459,14 +484,15 @@ check_allowed(const struct ipset_type *type, enum ipset_cmd command)
 			break;
 		}
 		/* Other options */
-		if (!arg) {
+		if (type->cmd[cmd].args[0] == IPSET_ARG_NONE) {
 			exit_error(OTHER_PROBLEM,
 				"There are not allowed options (%u) "
-				"but option list is NULL. "
+				"but option list is empty. "
 				"It's a bug, please report the problem.", i);
 			return;
 		}
-		for (; arg->opt; arg++) {
+		for (j = 0; type->cmd[cmd].args[j] != IPSET_ARG_NONE; j++) {
+			arg = ipset_keyword(type->cmd[cmd].args[j]);
 			if (arg->opt != i)
 				continue;
 			exit_error(OTHER_PROBLEM,
@@ -497,6 +523,21 @@ type_find(const char *name)
 	}
 	return NULL;
 }
+
+static enum ipset_adt cmd_help_order[] = {
+	IPSET_CREATE,
+	IPSET_ADD,
+	IPSET_DEL,
+	IPSET_TEST,
+	IPSET_CADT_MAX,
+};
+
+static const char *cmd_prefix[] = {
+	[IPSET_CREATE] = "create SETNAME",
+	[IPSET_ADD]    = "add    SETNAME",
+	[IPSET_DEL]    = "del    SETNAME",
+	[IPSET_TEST]   = "test   SETNAME",
+};
 
 /* Workhorse */
 int
@@ -656,28 +697,42 @@ parse_commandline(int argc, char *argv[])
 		if (interactive ||
 		    !ipset_envopt_test(session, IPSET_ENV_QUIET)) {
 			if (arg0) {
+				const struct ipset_arg *arg;
+				int k;
+
 				/* Type-specific help, without kernel checking */
 				type = type_find(arg0);
 				if (!type)
 					return exit_error(PARAMETER_PROBLEM,
 						"Unknown settype: `%s'", arg0);
-				printf("\n%s type specific options:\n\n%s",
-				       type->name, type->usage);
+				printf("\n%s type specific options:\n\n", type->name);
+				for (i = 0; cmd_help_order[i] != IPSET_CADT_MAX; i++) {
+					cmd = cmd_help_order[i];
+					printf("%s %s %s\n",
+						cmd_prefix[cmd], type->name, type->cmd[cmd].help);
+					for (k = 0; type->cmd[cmd].args[k] != IPSET_ARG_NONE; k++) {
+						arg = ipset_keyword(type->cmd[cmd].args[k]);
+						if (!arg->help || arg->help[0] == '\0')
+							continue;
+						printf("               %s\n", arg->help);
+					}
+				}
+				printf("\n%s\n", type->usage);
 				if (type->usagefn)
 					type->usagefn();
 				if (type->family == NFPROTO_UNSPEC)
 					printf("\nType %s is family neutral.\n",
 					       type->name);
 				else if (type->family == NFPROTO_IPSET_IPV46)
-					printf("\nType %s supports INET "
-					       "and INET6.\n",
+					printf("\nType %s supports inet "
+					       "and inet6.\n",
 					       type->name);
 				else
 					printf("\nType %s supports family "
 					       "%s only.\n",
 					       type->name,
 					       type->family == NFPROTO_IPV4
-						? "INET" : "INET6");
+						? "inet" : "inet6");
 			} else {
 				printf("\nSupported set types:\n");
 				type = ipset_types();
@@ -717,14 +772,14 @@ parse_commandline(int argc, char *argv[])
 			return handle_error();
 
 		/* Parse create options: first check INET family */
-		ret = call_parser(&argc, argv, type->args[IPSET_CREATE], true);
+		ret = call_parser(&argc, argv, type, IPSET_CREATE, true);
 		if (ret < 0)
 			return handle_error();
 		else if (ret)
 			return ret;
 
 		/* Parse create options: then check all options */
-		ret = call_parser(&argc, argv, type->args[IPSET_CREATE], false);
+		ret = call_parser(&argc, argv, type, IPSET_CREATE, false);
 		if (ret < 0)
 			return handle_error();
 		else if (ret)
@@ -792,7 +847,7 @@ parse_commandline(int argc, char *argv[])
 			return handle_error();
 
 		/* Parse additional ADT options */
-		ret = call_parser(&argc, argv, type->args[cmd2cmd(cmd)], false);
+		ret = call_parser(&argc, argv, type, cmd2cmd(cmd), false);
 		if (ret < 0)
 			return handle_error();
 		else if (ret)

@@ -1,5 +1,5 @@
 dnl Boilerplate
-AC_INIT([ipset], [6.29], [kadlec@blackhole.kfki.hu])
+AC_INIT([ipset], [6.38], [kadlec@blackhole.kfki.hu])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CANONICAL_HOST
 AC_CONFIG_MACRO_DIR([m4])
@@ -250,6 +250,16 @@ else
 	AC_SUBST(HAVE_NLA_PUT_BE64, undef)
 fi
 
+AC_MSG_CHECKING([kernel source for nla_put_64bit])
+if test -f $ksourcedir/include/net/netlink.h && \
+   $GREP -q 'nla_put_64bit' $ksourcedir/include/net/netlink.h; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(HAVE_NLA_PUT_64BIT, define)
+else
+	AC_MSG_RESULT(no)
+	AC_SUBST(HAVE_NLA_PUT_64BIT, undef)
+fi
+
 AC_MSG_CHECKING([kernel source for portid in nl_info])
 if test -f $ksourcedir/include/linux/netlink.h && \
    $AWK '/^struct netlink_skb_parms/ {for(i=1; i<=5; i++) {getline; print}}' $ksourcedir/include/linux/netlink.h | $GREP -q 'portid;'; then
@@ -477,6 +487,128 @@ else
 	AC_SUBST(HAVE_EXPORT_SYMBOL_GPL_IN_MODULE_H, undef)
 fi
 
+AC_MSG_CHECKING([kernel source for tc_skb_protocol in pkt_sched.h])
+if test -f $ksourcedir/include/net/pkt_sched.h && \
+   $GREP -q 'tc_skb_protocol' $ksourcedir/include/net/pkt_sched.h; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(HAVE_TC_SKB_PROTOCOL, define)
+else
+	AC_MSG_RESULT(no)
+	AC_SUBST(HAVE_TC_SKB_PROTOCOL, undef)
+fi
+
+AC_MSG_CHECKING([kernel source for struct net in struct xt_action_param])
+if test -f $ksourcedir/include/linux/netfilter/x_tables.h && \
+   $AWK '/^struct xt_action_param / {for(i=1; i<=8; i++) {getline; print}}' $ksourcedir/include/linux/netfilter/x_tables.h | \
+   $GREP -q 'struct net '; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(HAVE_NET_IN_XT_ACTION_PARAM, define)
+else
+	AC_MSG_RESULT(no)
+	AC_SUBST(HAVE_NET_IN_XT_ACTION_PARAM, undef)
+fi
+
+AC_MSG_CHECKING([kernel source for struct nf_hook_state in struct xt_action_param])
+if test -f $ksourcedir/include/linux/netfilter/x_tables.h && \
+   $AWK '/^struct xt_action_param / {for(i=1; i<=10; i++) {getline; print}}' $ksourcedir/include/linux/netfilter/x_tables.h | \
+   $GREP -q 'struct nf_hook_state '; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(HAVE_STATE_IN_XT_ACTION_PARAM, define)
+else
+	AC_MSG_RESULT(no)
+	AC_SUBST(HAVE_STATE_IN_XT_ACTION_PARAM, undef)
+fi
+
+AC_MSG_CHECKING([kernel source for xt_family() in x_tables.h])
+if test -f $ksourcedir/include/linux/netfilter/x_tables.h && \
+   $GREP -q 'xt_family' $ksourcedir/include/linux/netfilter/x_tables.h; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(HAVE_XT_FAMILY, define)
+else
+	AC_MSG_RESULT(no)
+	AC_SUBST(HAVE_XT_FAMILY, undef)
+fi
+
+AC_MSG_CHECKING([kernel source for xt_net() in x_tables.h])
+if test -f $ksourcedir/include/linux/netfilter/x_tables.h && \
+   $GREP -q 'xt_net' $ksourcedir/include/linux/netfilter/x_tables.h; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(HAVE_XT_NET, define)
+else
+	AC_MSG_RESULT(no)
+	AC_SUBST(HAVE_XT_NET, undef)
+fi
+
+AC_MSG_CHECKING([kernel source for nfnl_msg_type() in nfnetlink.h])
+if test -f $ksourcedir/include/linux/netfilter/nfnetlink.h && \
+   $GREP -q 'nfnl_msg_type' $ksourcedir/include/linux/netfilter/nfnetlink.h; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(HAVE_NFNL_MSG_TYPE, define)
+else
+	AC_MSG_RESULT(no)
+	AC_SUBST(HAVE_NFNL_MSG_TYPE, undef)
+fi
+
+AC_MSG_CHECKING([kernel source for netlink extended ACK])
+if test -f $ksourcedir/include/linux/netlink.h && \
+   $AWK '/^extern void netlink_ack/ {for(i=1; i<=2; i++) {getline; print}}' $ksourcedir/include/linux/netlink.h | $GREP -q 'const struct netlink_ext_ack'; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(HAVE_NETLINK_EXTENDED_ACK, define)
+else
+	AC_MSG_RESULT(no)
+	AC_SUBST(HAVE_NETLINK_EXTENDED_ACK, undef)
+fi
+
+AC_MSG_CHECKING([kernel source for passing extended ACK struct to parsing functions])
+if test -f $ksourcedir/include/net/netlink.h && \
+   $AWK '/^static inline int nla_parse_nested/ {for(i=1; i<=4; i++) {getline; print}}' $ksourcedir/include/net/netlink.h | $GREP -q 'struct netlink_ext_ack'; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(HAVE_PASSING_EXTENDED_ACK_TO_PARSERS, define)
+else
+	AC_MSG_RESULT(no)
+	AC_SUBST(HAVE_PASSING_EXTENDED_ACK_TO_PARSERS, undef)
+fi
+
+AC_MSG_CHECKING([kernel source for passing extended ACK struct to callback functions])
+if test -f $ksourcedir/include/linux/netfilter/nfnetlink.h && \
+   $AWK '/^struct nfnl_callback / {for(i=1; i<=5; i++) {getline; print}}' $ksourcedir/include/linux/netfilter/nfnetlink.h | $GREP -q 'struct netlink_ext_ack'; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(HAVE_PASSING_EXTENDED_ACK_TO_CALLBACKS, define)
+else
+	AC_MSG_RESULT(no)
+	AC_SUBST(HAVE_PASSING_EXTENDED_ACK_TO_CALLBACKS, undef)
+fi
+
+AC_MSG_CHECKING([kernel source for no typedef sctp_sctphdr_t])
+if test -f $ksourcedir/include/linux/sctp.h && \
+   $GREP -q '^typedef struct sctphdr' $ksourcedir/include/linux/sctp.h; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(HAVE_TYPEDEF_SCTP_SCTPHDR_T, define)
+else
+	AC_MSG_RESULT(no)
+	AC_SUBST(HAVE_TYPEDEF_SCTP_SCTPHDR_T, undef)
+fi
+
+AC_MSG_CHECKING([kernel source for timer_setup in timer.h])
+if test -f $ksourcedir/include/linux/timer.h && \
+   $GREP -q ' timer_setup' $ksourcedir/include/linux/timer.h; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(HAVE_TIMER_SETUP, define)
+else
+	AC_MSG_RESULT(no)
+	AC_SUBST(HAVE_TIMER_SETUP, undef)
+fi
+
+AC_MSG_CHECKING([kernel source for lockdep_nfnl_is_held() in nfnetlink.h])
+if test -f $ksourcedir/include/linux/netfilter/nfnetlink.h && \
+   $GREP -q ' lockdep_nfnl_is_held' $ksourcedir/include/linux/netfilter/nfnetlink.h; then
+	AC_MSG_RESULT(yes)
+	AC_SUBST(HAVE_LOCKDEP_NFNL_IS_HELD, define)
+else
+	AC_MSG_RESULT(no)
+	AC_SUBST(HAVE_LOCKDEP_NFNL_IS_HELD, undef)
+fi
+
 AC_MSG_CHECKING([kernel source for struct net_generic])
 if test -f $ksourcedir/include/net/netns/generic.h && \
    $GREP -q 'struct net_generic' $ksourcedir/include/net/netns/generic.h; then
@@ -560,7 +692,7 @@ elif echo $SETTYPE_MODLIST | grep "all" >/dev/null; then
 	done
 else
 	for mod in $IPSET_ALL_MODULES; do
-		if echo $SETTYPE_MODLIST | grep $mod >/dev/null; then
+		if echo $SETTYPE_MODLIST | grep -w "$mod" >/dev/null; then
 			:
 		else
 			AC_MSG_RESULT([        ${mod}])
@@ -568,7 +700,7 @@ else
 	done
 	AC_MSG_RESULT([    Dynamic modules:])
 	for mod in $IPSET_ALL_MODULES; do
-		if echo $SETTYPE_MODLIST | grep $mod >/dev/null; then
+		if echo $SETTYPE_MODLIST | grep -w "$mod" >/dev/null; then
 			AC_MSG_RESULT([        ${mod}])
 		fi
 	done

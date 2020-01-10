@@ -37,15 +37,12 @@
 #define get_ext(set, map, id)	((map)->extensions + ((set)->dsize * (id)))
 
 static void
-mtype_gc_init(struct ip_set *set, void (*gc)(unsigned long ul_set))
+mtype_gc_init(struct ip_set *set, void (*gc)(GC_ARG))
 {
 	struct mtype *map = set->data;
 
-	init_timer(&map->gc);
-	map->gc.data = (unsigned long)set;
-	map->gc.function = gc;
-	map->gc.expires = jiffies + IPSET_GC_PERIOD(set->timeout) * HZ;
-	add_timer(&map->gc);
+	TIMER_SETUP(&map->gc, gc);
+	mod_timer(&map->gc, jiffies + IPSET_GC_PERIOD(set->timeout) * HZ);
 }
 
 static void
@@ -89,9 +86,12 @@ mtype_flush(struct ip_set *set)
 
 /* Calculate the actual memory size of the set data */
 static size_t
-mtype_memsize(const struct mtype *map)
+mtype_memsize(const struct mtype *map, size_t dsize)
 {
-	return sizeof(*map) + map->memsize;
+	size_t memsize = sizeof(*map) +
+			 map->memsize +
+			 map->elements * dsize;
+	return memsize;
 }
 
 static int
@@ -99,7 +99,7 @@ mtype_head(struct ip_set *set, struct sk_buff *skb)
 {
 	const struct mtype *map = set->data;
 	struct nlattr *nested;
-	size_t memsize = mtype_memsize(map) + set->ext_size;
+	size_t memsize = mtype_memsize(map, set->dsize) + set->ext_size;
 
 	nested = ipset_nest_start(skb, IPSET_ATTR_DATA);
 	if (!nested)
@@ -129,14 +129,7 @@ mtype_test(struct ip_set *set, void *value, const struct ip_set_ext *ext,
 
 	if (ret <= 0)
 		return ret;
-	if (SET_WITH_TIMEOUT(set) &&
-	    ip_set_timeout_expired(ext_timeout(x, set)))
-		return 0;
-	if (SET_WITH_COUNTER(set))
-		ip_set_update_counter(ext_counter(x, set), ext, mext, flags);
-	if (SET_WITH_SKBINFO(set))
-		ip_set_get_skbinfo(ext_skbinfo(x, set), ext, mext, flags);
-	return 1;
+	return ip_set_match_extensions(set, ext, mext, flags, x);
 }
 
 static int
@@ -229,12 +222,13 @@ mtype_list(const struct ip_set *set,
 	rcu_read_lock();
 	for (; cb->args[IPSET_CB_ARG0] < map->elements;
 	     cb->args[IPSET_CB_ARG0]++) {
+		cond_resched_rcu();
 		id = cb->args[IPSET_CB_ARG0];
 		x = get_ext(set, map, id);
 		if (!test_bit(id, map->members) ||
 		    (SET_WITH_TIMEOUT(set) &&
 #ifdef IP_SET_BITMAP_STORED_TIMEOUT
-		     mtype_is_filled((const struct mtype_elem *)x) &&
+		     mtype_is_filled(x) &&
 #endif
 		     ip_set_timeout_expired(ext_timeout(x, set))))
 			continue;
@@ -250,8 +244,7 @@ mtype_list(const struct ip_set *set,
 		}
 		if (mtype_do_list(skb, map, id, set->dsize))
 			goto nla_put_failure;
-		if (ip_set_put_extensions(skb, set, x,
-		    mtype_is_filled((const struct mtype_elem *)x)))
+		if (ip_set_put_extensions(skb, set, x, mtype_is_filled(x)))
 			goto nla_put_failure;
 		ipset_nest_end(skb, nested);
 	}
@@ -275,10 +268,9 @@ out:
 }
 
 static void
-mtype_gc(unsigned long ul_set)
+mtype_gc(GC_ARG)
 {
-	struct ip_set *set = (struct ip_set *)ul_set;
-	struct mtype *map = set->data;
+	INIT_GC_VARS(mtype, map);
 	void *x;
 	u32 id;
 

@@ -1,5 +1,5 @@
 # Create a set with timeout
-0 ipset create test hash:ip,port timeout 5
+0 ipset create test hash:ip,port timeout 4
 # Add partly zero valued element
 0 ipset add test 2.0.0.1,0
 # Test partly zero valued element
@@ -26,6 +26,10 @@
 0 ipset add test 2.0.0.0,5
 # Try to add value after second random value
 0 ipset add test 2.1.0.1,128
+# Add port by name
+0 ipset add test 2.1.0.3,smtp
+# Delete port by number
+0 ipset del test 2.1.0.3,25
 # List set
 0 ipset list test | grep -v Revision: | sed 's/timeout ./timeout x/' > .foo0 && ./sort.sh .foo0
 # Check listing

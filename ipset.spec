@@ -2,8 +2,8 @@
 %define legacy_actions %{_libexecdir}/initscripts/legacy-actions
 
 Name:             ipset
-Version:          6.29
-Release:          1%{?dist}
+Version:          6.38
+Release:          2%{?dist}
 Summary:          Manage Linux IP sets
 
 License:          GPLv2
@@ -136,6 +136,20 @@ fi
 %postun service
 %systemd_postun_with_restart %{name}.service
 
+%triggerin service -- ipset-service < 6.38-1%{?dist}
+# Before 6.38-1, ipset.start-stop keeps a backup of previously saved sets, but
+# doesn't touch the /etc/sysconfig/ipset.d/.saved flag. Remove the backup on
+# upgrade, so that we use the current version of saved sets
+rm -f /etc/sysconfig/ipset.save || :
+exit 0
+
+%triggerun service -- ipset-service < 6.38-1%{?dist}
+# Up to 6.29-1, ipset.start-stop uses a single data file
+for f in /etc/sysconfig/ipset.d/*; do
+    [ "${f}" = "/etc/sysconfig/ipset.d/*" ] && break
+    cat ${f} >> /etc/sysconfig/ipset || :
+done
+exit 0
 
 %files
 %doc COPYING ChangeLog
@@ -144,7 +158,7 @@ fi
 
 %files libs
 %doc COPYING
-%{_libdir}/lib%{name}.so.3*
+%{_libdir}/lib%{name}.so.11*
 
 %files devel
 %{_includedir}/lib%{name}
@@ -162,6 +176,18 @@ fi
 
 
 %changelog
+* Wed Jun 27 2018 Stefano Brivio <sbrivio@redhat.com> - 6.38-2
+- Fix upgrade and downgrade triggers in specfile (RHBZ#1594722)
+
+* Mon Apr 16 2018 Stefano Brivio <sbrivio@redhat.com> - 6.38-1
+- Rebase to 6.38 (RHBZ#1557600):
+  - hash:ipmac type support added to ipset, userspace part (Tomasz Chilinski)
+- Refactor /etc/sysconfig/ipset.start-stop
+- Fixes:
+  - IPSet Service Monolithic Operation (RHBZ#1440741)
+  - "systemctl start ipset" doesn't handle existing ipset's having counters
+    (RHBZ#1502212)
+
 * Wed Feb  1 2017 Thomas Woerner <twoerner@redhat.com> - 6.29-1
 - Rebase to 6.29 (RHBZ#1351299)
 - Fixes:

@@ -1,5 +1,5 @@
 # Create a set with timeout
-0 ipset create test nethash hashsize 128 timeout 5
+0 ipset create test nethash hashsize 128 timeout 4
 # Add zero valued element
 1 ipset add test 0.0.0.0/0
 # Test zero valued element
@@ -86,6 +86,8 @@
 0 ipset -A test 1.1.1.0/26
 # Check non-matching IP
 1 ipset -T test 1.1.1.1
+# Check non-matching IP with nomatch flag
+0 ipset -T test 1.1.1.1 nomatch
 # Check matching IP from non-matchin small net
 0 ipset -T test 1.1.1.3
 # Check non-matching IP from larger net
@@ -120,6 +122,16 @@
 0 ./resizet.sh -4 net
 # Nomatch: Check that resizing keeps the nomatch flag
 0 ./resizen.sh -4 net
+# Create set without timeout support
+0 ipset n test hash:net
+# Add more than 2^31 elements in a range
+0 ipset a test 0.0.0.0-128.0.0.1
+# List set
+0 ipset -L test 2>/dev/null | grep -v Revision: > .foo0 && ./sort.sh .foo0
+# Check listing
+0 diff -u -I 'Size in memory.*' .foo hash:net.t.list3
+# Delete test set
+0 ipset destroy test
 # Counters: create set
 0 ipset n test hash:net counters
 # Counters: add element with packet, byte counters

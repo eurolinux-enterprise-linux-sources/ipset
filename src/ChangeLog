@@ -1,3 +1,52 @@
+6.38
+  - Fix API version number
+
+6.37
+  - Fix parsing service names for ports (reported by Yuri D'Elia)
+
+6.36
+  - Use 'ss' in runtest.sh but fall back to deprecated 'net-tools'
+    command (bugzilla id #1209)
+  - build: do install libipset/args.h (Jan Engelhardt)
+  - Add test to verify wraparound fix
+
+6.35
+  - Userspace revision handling is reworked
+  - Replace the last reference to u_int8_t with uint8_t.
+
+6.34
+  - testsuite: Make sure it can be run over ssh :-)
+  - Reset state after a command failed, when multiple ones are issued
+    (bugzilla id #1158, reported by Dimitri Grischin)
+  - Handle padding attribute properly in userspace.
+  - Test to check the fix to add an IPv4 range containing more than 2^31
+    addresses
+  - Fix the include guards on the include/libipset/linux_ip_set*.h
+    (bugzilla id #1139, suggested by Quentin Armitage)
+  - New function added in commit 54802b2c is missing from libipset.map
+    (bugzilla id #1182, reported by irherder@gmail.com)
+
+6.33
+  - Report if the option is supported by a newer kernel release
+  - ipset: Fix ipset command replacement in runtest.sh (Neutron Soutmun)
+  - Correct a test: number of entries may be outdated
+
+6.32
+  - Fix possible truncated output in ipset output buffer handling
+    (Reported by Omri Bahumi and Yoni Lavi).
+  - Missing prototype added in ipset_hash_ipmac.c (debugging)
+
+6.31
+  - Update manpage about the size parameter of list:set types.
+  - New test to verify that only the intended entries are deleted at hash
+    types.
+
+6.30
+  - Drop extra comma from error message (Neutron Soutmun)
+  - Fix the incorrect dynamic/static modules list (Neutron Soutmun)
+  - Correct tests to check the number of entries too
+  - hash:ipmac type support added to ipset, userspace part (Tomasz Chilinski)
+
 6.29
   - Suppress unnecessary stderr in command loop for resize and list
   - Correction in comment test
